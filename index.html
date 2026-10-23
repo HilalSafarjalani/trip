@@ -337,7 +337,7 @@ function render(pos,mode){
   // Speed is your own average while moving (stops excluded), capped by what each country's roads allow,
   // so every minute you stand still pushes the whole range a minute later.
   const stopped=stoppedSince!==null&&now-stoppedSince>60e3;
-  const S=log.moving>15*60e3&&log.movingKm?log.movingKm/(log.moving/36e5):null;
+  const S0=log.sMs>15*60e3?log.sKm/(log.sMs/36e5):null,S=S0&&S0>=20?Math.min(S0,140):null;
   const legSpeed=i=>S?Math.min(S,CAP[i]):CAP[i];
   const airLeft=i=>i<leg?0:i===leg?Math.min(L[i],hav(pos,P[i+1])):L[i];
   const rangeTo=last=>{let a=0,b=0;for(let i=leg;i<=last&&i<L.length;i++){const k=airLeft(i),s=legSpeed(i);a+=k*ROAD[i][0]/s;b+=k*ROAD[i][1]/(s*0.92)}
@@ -414,7 +414,8 @@ function renderPrayer(pos,cc){
 setInterval(()=>{if(pLast)renderPrayer(pLast.pos,pLast.cc)},30e3);
 
 /* ---------- trip log ---------- */
-let lastFix=null,stoppedSince=null,lastSpeed=0;
+let lastFix=null,stoppedSince=null,lastSpeed=0,awaitingFix=false;
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)awaitingFix=true});
 const accurateSpeed=g=>g.coords.speed!=null&&g.coords.speed>=0&&g.coords.accuracy<100?g.coords.speed*3.6:null;
 function updateLog(g){
   const now=Date.now(),pos={lat:g.coords.latitude,lng:g.coords.longitude};
@@ -425,9 +426,10 @@ function updateLog(g){
       const moved=hav(lastFix.pos,pos);
       // long gaps (page closed or GPS quiet): judge by distance covered; short gaps: by reported speed
       let kmh=dt<5*60e3&&g.coords.speed!=null&&g.coords.speed>=0?g.coords.speed*3.6:moved/(dt/36e5);
-      if(kmh<3||moved<0.05&&dt>=60e3){log.stopped+=dt;if(stoppedSince===null)stoppedSince=lastFix.t;
+      const driving=kmh>=5&&moved>=Math.max(0.03,(g.coords.accuracy||0)/1000);
+      if(!driving){log.stopped+=dt;if(stoppedSince===null)stoppedSince=lastFix.t;
         const z=ZONES.find(z=>hav(pos,P[z.p])<z.r);if(z)log.wait[z.p]=(log.wait[z.p]||0)+dt}
-      else{log.moving+=dt;log.movingKm=(log.movingKm||0)+moved;stoppedSince=null}
+      else{log.moving+=dt;log.sKm=(log.sKm||0)+moved;log.sMs=(log.sMs||0)+dt;stoppedSince=null}
       lastSpeed=accurateSpeed(g)??kmh;
       if(g.coords.speed!=null&&g.coords.accuracy<30){const s=g.coords.speed*3.6;if(s<200&&s>log.maxV)log.maxV=s}
     }
@@ -436,7 +438,8 @@ function updateLog(g){
 }
 // When standing still the GPS often stops reporting. Every 30 s, count the quiet time as stopped and refresh the ETA.
 setInterval(()=>{
-  if(FOLLOW||!last||!lastFix||leg>=L.length||Date.now()-lastFix.t<45e3)return;
+  // skip while the page is hidden (GPS is paused then, so silence does not mean you stopped)
+  if(FOLLOW||document.hidden||awaitingFix||!last||!lastFix||leg>=L.length||Date.now()-lastFix.t<45e3)return;
   updateLog({coords:{latitude:last.lat,longitude:last.lng,speed:0,accuracy:999}});render(last,true);
 },30e3);
 function renderLog(){
@@ -451,7 +454,7 @@ function renderLog(){
 if(FOLLOW){/* followers never read their own GPS */}
 else if(!("geolocation" in navigator)){$("status").textContent="المتصفح لا يدعم تحديد الموقع."}
 else navigator.geolocation.watchPosition(g=>{
-  last={lat:g.coords.latitude,lng:g.coords.longitude};
+  last={lat:g.coords.latitude,lng:g.coords.longitude};awaitingFix=false;
   if(leg<L.length){$("status").textContent="آخر تحديث "+new Date().toLocaleTimeString("ar-u-nu-latn",{hour:"numeric",minute:"2-digit",second:"2-digit"})+" · دقة ±"+Math.round(g.coords.accuracy)+" م";$("status").className="status ok"}
   updateLog(g);render(last,true);
 },e=>{$("status").textContent=e.code===1?"رُفض إذن الموقع. اسمح به من إعدادات المتصفح ثم أعد فتح الصفحة.":"تعذّر الحصول على الموقع، أحاول مجددًا…";$("status").className="status"},
@@ -524,7 +527,7 @@ function applyRemote(text){
   leg=Math.max(0,Math.min(L.length,Math.floor(num(s.leg))));
   doneAt={};if(s.doneAt&&typeof s.doneAt==="object")for(const k in s.doneAt)if(/^[0-4]$/.test(k))doneAt[k]=num(s.doneAt[k]);
   const g=s.log||{},w={};if(g.wait&&typeof g.wait==="object")for(const k in g.wait)if(/^[0-9]$/.test(k))w[k]=num(g.wait[k]);
-  log={start:num(g.start,null),moving:num(g.moving),stopped:num(g.stopped),maxV:num(g.maxV),movingKm:num(g.movingKm),wait:w};
+  log={start:num(g.start,null),moving:num(g.moving),stopped:num(g.stopped),maxV:num(g.maxV),sKm:num(g.sKm),sMs:num(g.sMs),wait:w};
   stoppedSince=s.stoppedSince==null?null:num(s.stoppedSince,null);lastSpeed=num(s.speed);followTs=num(s.ts);
   last={lat,lng};renderLog();render(last,"follow");followAge();
 }
