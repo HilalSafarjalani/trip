@@ -85,6 +85,9 @@ details[open].card summary::after{content:" ▴"}
 .dua small{font-family:var(--display);font-size:.75rem;color:var(--muted);display:block;line-height:1.5}
 .ayibun{border:2px solid var(--ok);text-align:center}
 .ayibun p{font-family:var(--quran);font-size:1.6rem;margin:4px 0}
+.famlink{width:100%;font:inherit;font-size:.8rem;direction:ltr;text-align:left;background:var(--sand);color:var(--ink);border:1px solid var(--muted);border-radius:8px;padding:9px 10px;margin:8px 0}
+.famrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.followbar{background:var(--ok);color:#fff;border-radius:10px;padding:10px 14px;font-weight:700;font-size:.9rem}
 .reset{font:inherit;font-size:.8rem;background:none;border:1px solid var(--muted);color:var(--muted);border-radius:8px;padding:8px 12px;align-self:flex-start}
 .toast{position:fixed;left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));
   background:var(--ink);color:var(--sand);border-radius:12px;padding:14px 16px;font-weight:700;font-size:.95rem;line-height:1.5;
@@ -100,6 +103,7 @@ details[open].card summary::after{content:" ▴"}
   <h1>المدينة المنورة ← طرابلس</h1>
   <span class="chip" id="country">🇸🇦 السعودية</span>
 </div>
+<div class="followbar" id="followBar" hidden>تتابع الرحلة مباشرة من هاتف المسافر</div>
 <div class="pct" id="pct">0<small>%</small></div>
 
 <div>
@@ -117,18 +121,35 @@ details[open].card summary::after{content:" ▴"}
 
 <div class="status" id="status" aria-live="polite">جارٍ طلب الموقع…</div>
 
-<section class="card" aria-labelledby="ph">
+<section class="card" id="prayerCard" aria-labelledby="ph">
   <h3 id="ph">الصلاة القادمة · <span id="ptz">بتوقيت السعودية</span></h3>
   <div class="next"><b id="pnext">—</b><span id="pcount">—</span></div>
   <div class="ptimes" id="ptimes"></div>
   <p class="small">رخصة المسافر: قصر الرباعية، والجمع بين الظهر والعصر وبين المغرب والعشاء. المواقيت محسوبة تقريبًا من موقعك (± دقائق)، فاعتمد أذان البلد إن سمعته.</p>
 </section>
 
-<div class="actions">
+<div class="actions" id="actions">
+  <a class="btn primary" id="mapLink" href="#" target="_blank" rel="noopener" hidden>موقعه على الخريطة</a>
   <a class="btn primary" id="share" href="#" target="_blank" rel="noopener">شارك موقعي واتساب</a>
   <button class="btn" id="notif" type="button">تفعيل التنبيهات</button>
   <button class="btn" id="screen" type="button" aria-pressed="true">الشاشة مضاءة</button>
 </div>
+
+<section class="card" id="family">
+  <h3>متابعة الأهل مباشرة</h3>
+  <p class="small" style="margin-top:0">يفتح أهلك رابطًا خاصًّا فيرون هذه الصفحة نفسها على هواتفهم: موقعك والمراحل ووقت الوصول، تتحدّث كل بضع دقائق ما دامت الصفحة مفتوحة عندك.</p>
+  <button class="btn primary" id="famOn" type="button" style="width:100%;margin-top:8px">ابدأ بثّ موقعي للأهل</button>
+  <div id="famLive" hidden>
+    <input class="famlink" id="famLink" readonly aria-label="رابط المتابعة">
+    <div class="famrow">
+      <a class="btn primary" id="famWa" href="#" target="_blank" rel="noopener">أرسل الرابط واتساب</a>
+      <button class="btn" id="famCopy" type="button">نسخ الرابط</button>
+      <button class="btn" id="famOff" type="button">إيقاف البثّ</button>
+    </div>
+    <p class="small" id="famStatus">جاهز للإرسال</p>
+    <p class="small">من معه الرابط يرى موقعك. يمرّ التحديث عبر خدمة ntfy.sh المجانية ويُحذف منها بعد 12 ساعة.</p>
+  </div>
+</section>
 
 <div class="card ayibun" id="ayibun" hidden>
   <p>آيِبُونَ تَائِبُونَ عَابِدُونَ لِرَبِّنَا حَامِدُونَ</p>
@@ -157,6 +178,10 @@ details[open].card summary::after{content:" ▴"}
 <canvas id="confetti" aria-hidden="true"></canvas>
 
 <script>
+/* ---------- mode: traveler (default) or family follower (?follow=topic) ---------- */
+const FOLLOW_RAW=new URLSearchParams(location.search).get("follow");
+const FOLLOW=FOLLOW_RAW&&/^[a-z0-9-]{8,64}$/.test(FOLLOW_RAW)?FOLLOW_RAW:null;
+
 /* ---------- route ---------- */
 const P=[
   {n:"المدينة",lat:24.4889704,lng:39.5833142},
@@ -244,8 +269,9 @@ function prayersAround(pos,cc,now){
 }
 
 /* ---------- storage ---------- */
-const get=(k,def)=>{try{const v=JSON.parse(localStorage.getItem(k));return v===null?def:v}catch(e){return def}};
-const put=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const NS=FOLLOW?"f-":"";
+const get=(k,def)=>{try{const v=JSON.parse(localStorage.getItem(NS+k));return v===null?def:v}catch(e){return def}};
+const put=(k,v)=>{try{localStorage.setItem(NS+k,JSON.stringify(v))}catch(e){}};
 let leg=get("trip-leg",0), doneAt=get("trip-done",{}), fired=get("trip-fired",{}), lastCountry=get("trip-country",null);
 let log=get("trip-log",{start:null,moving:0,stopped:0,maxV:0,wait:{}});
 let screenOn=get("trip-screen",true);
@@ -298,7 +324,8 @@ function advance(pos){
 
 /* ---------- main render ---------- */
 let hist=[],last=null,lastV=0,prevP=null;
-function render(pos,live){
+function render(pos,mode){
+  const live=mode===true; // true: this phone's GPS; "follow": a family member's copy; false: first paint
   if(live)advance(pos);
   const now=Date.now(),arrived=leg>=L.length;
   const doneKm=arrived?TOTAL:(leg>0?CUM[leg-1]:0)+Math.max(0,Math.min(L[leg],L[leg]-hav(pos,P[leg+1])));
@@ -333,14 +360,15 @@ function render(pos,live){
   $("fill").style.width=p+"%";$("car").style.right=p+"%";
   $("rem").textContent=arrived?"0 km":Math.round(roadLeft[0]/10)*10+"–"+Math.round(roadLeft[1]/10)*10+" km";
   $("done").textContent=doneKm.toFixed(0)+" km";
-  if(live)$("spd").textContent=(stopped?0:Math.max(0,lastSpeed)).toFixed(0)+" km/h";
+  if(mode)$("spd").textContent=(stopped?0:Math.max(0,lastSpeed)).toFixed(0)+" km/h";
   const fin=rangeTo(L.length-1);
-  $("eta").textContent=arrived?"وصلت ✓":fmtRange(fin[0],fin[1],"Asia/Beirut");
+  $("eta").textContent=arrived?(FOLLOW?"وصل ✓":"وصلت ✓"):fmtRange(fin[0],fin[1],"Asia/Beirut");
   $("etaNote").textContent=!arrived&&stopped?"متوقّف منذ "+dur(now-stoppedSince)+"، والوقت يتأخر معه":"بتوقيت لبنان"+(S?"":" · يدقّ أكثر بعد ربع ساعة سير");
 
   const cc=arrived?"LB":legCountry(leg);
   $("country").textContent=C[cc].flag+" "+C[cc].name;
-  renderPrayer(pos,cc);
+  if(!FOLLOW)renderPrayer(pos,cc);
+  $("mapLink").href="https://maps.google.com/?q="+pos.lat.toFixed(5)+","+pos.lng.toFixed(5);
 
   // share link
   const msg=arrived?"وصلنا طرابلس بحمد الله ✓":
@@ -352,19 +380,20 @@ function render(pos,live){
   // near home
   $("ayibun").hidden=!(arrived||(leg===4&&hav(pos,P[5])<15));
 
-  if(live)events(pos,p,cc,arrived);
+  if(mode)events(pos,p,cc,arrived);
+  if(live)publish(false);
 }
 
 /* ---------- events: country, borders, milestones, arrival ---------- */
 function events(pos,p,cc,arrived){
   if(lastCountry===null){lastCountry=cc;put("trip-country",cc)}
   else if(cc!==lastCountry){lastCountry=cc;put("trip-country",cc);
-    if(fire("country-"+cc)){notify("أهلًا بك في "+C[cc].name+" "+C[cc].flag,"المرحلة التالية: "+P[Math.min(leg+1,5)].n);confetti(false)}}
-  if(BORDER_MSG[leg]&&hav(pos,P[leg+1])<30&&fire("border-"+leg))notify(BORDER_MSG[leg][0],BORDER_MSG[leg][1]);
+    if(fire("country-"+cc)){notify((FOLLOW?"دخل ":"أهلًا بك في ")+C[cc].name+" "+C[cc].flag,"المرحلة التالية: "+P[Math.min(leg+1,5)].n);confetti(false)}}
+  if(!FOLLOW&&BORDER_MSG[leg]&&hav(pos,P[leg+1])<30&&fire("border-"+leg))notify(BORDER_MSG[leg][0],BORDER_MSG[leg][1]);
   const ms=[[25,"ربع الطريق! 🎉","بقي ثلاثة أرباع، يسّر الله"],[50,"نصف الطريق! 🎉","الحمد لله، النصف الثاني أهون"],[75,"ثلاثة أرباع الطريق! 🎉","اقتربنا كثيرًا"]];
   ms.forEach(([m,t,b])=>{if(prevP===null){if(p>=m)fire("m"+m)}else if(prevP<m&&p>=m&&fire("m"+m)){notify(t,b);confetti(true)}});
-  if(leg===4&&hav(pos,P[5])<10&&fire("last10")){notify("آخر 10 كم! 🏠","آيبون تائبون عابدون لربنا حامدون");confetti(true)}
-  if(arrived&&fire("arrived")){notify("الحمد لله على السلامة 🇱🇧","وصلتَ طرابلس");confetti(true);$("status").textContent="وصلتَ طرابلس بحمد الله ✓";$("status").className="status ok"}
+  if(leg===4&&hav(pos,P[5])<10&&fire("last10")){notify("آخر 10 كم! 🏠",FOLLOW?"اقترب من طرابلس":"آيبون تائبون عابدون لربنا حامدون");confetti(true)}
+  if(arrived&&fire("arrived")){notify("الحمد لله على السلامة 🇱🇧",FOLLOW?"وصل طرابلس":"وصلتَ طرابلس");confetti(true);$("status").textContent=(FOLLOW?"وصل":"وصلتَ")+" طرابلس بحمد الله ✓";$("status").className="status ok"}
   prevP=p;
 }
 
@@ -407,7 +436,7 @@ function updateLog(g){
 }
 // When standing still the GPS often stops reporting. Every 30 s, count the quiet time as stopped and refresh the ETA.
 setInterval(()=>{
-  if(!last||leg>=L.length||Date.now()-lastFix.t<45e3)return;
+  if(FOLLOW||!last||!lastFix||leg>=L.length||Date.now()-lastFix.t<45e3)return;
   updateLog({coords:{latitude:last.lat,longitude:last.lng,speed:0,accuracy:999}});render(last,true);
 },30e3);
 function renderLog(){
@@ -419,7 +448,8 @@ function renderLog(){
 }
 
 /* ---------- geolocation ---------- */
-if(!("geolocation" in navigator)){$("status").textContent="المتصفح لا يدعم تحديد الموقع."}
+if(FOLLOW){/* followers never read their own GPS */}
+else if(!("geolocation" in navigator)){$("status").textContent="المتصفح لا يدعم تحديد الموقع."}
 else navigator.geolocation.watchPosition(g=>{
   last={lat:g.coords.latitude,lng:g.coords.longitude};
   if(leg<L.length){$("status").textContent="آخر تحديث "+new Date().toLocaleTimeString("ar-u-nu-latn",{hour:"numeric",minute:"2-digit",second:"2-digit"})+" · دقة ±"+Math.round(g.coords.accuracy)+" م";$("status").className="status ok"}
@@ -436,6 +466,7 @@ syncNotifBtn();
 
 let lock=null;
 async function applyScreen(){
+  if(FOLLOW)return;
   $("screen").setAttribute("aria-pressed",screenOn);$("screen").textContent=screenOn?"الشاشة مضاءة":"توفير البطارية";
   try{if(screenOn&&document.visibilityState==="visible"&&!lock){lock=await navigator.wakeLock.request("screen");lock.addEventListener("release",()=>{lock=null})}
     else if(!screenOn&&lock){await lock.release();lock=null}}catch(e){}
@@ -446,11 +477,86 @@ applyScreen();
 
 $("reset").onclick=()=>{leg=0;stoppedSince=null;doneAt={};fired={};lastCountry=null;prevP=null;hist=[];lastV=0;lastFix=null;
   log={start:null,moving:0,stopped:0,maxV:0,wait:{}};
-  ["trip-leg","trip-done","trip-fired","trip-country","trip-log"].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+  ["trip-leg","trip-done","trip-fired","trip-country","trip-log"].forEach(k=>{try{localStorage.removeItem(NS+k)}catch(e){}});
   renderLog();render(last||P[0],false)};
 
+/* ---------- family: broadcasting (traveler) ---------- */
+let fam=get("trip-fam",null);
+const pub={t:0,leg:-1,stopped:null,wait:0};
+const famURL=()=>location.origin+location.pathname+"?follow="+fam.topic;
+function newTopic(){const a=new Uint8Array(14);crypto.getRandomValues(a);return "trip-"+Array.from(a,b=>(b%36).toString(36)).join("")}
+function famStatus(t){$("famStatus").textContent=t}
+function syncFam(){
+  const on=!!(fam&&fam.on);$("famOn").hidden=on;$("famLive").hidden=!on;
+  if(fam){$("famLink").value=famURL();
+    $("famWa").href="https://wa.me/?text="+encodeURIComponent("تابعوا رحلتي من المدينة إلى طرابلس مباشرة، بالموقع ووقت الوصول:\n"+famURL())}
+}
+// Sends every 7 min while moving, every 15 min while stopped, and at once when a stage changes or you stop/start.
+async function publish(force){
+  if(FOLLOW||!fam||!fam.on||!last)return;
+  const now=Date.now();if(now<pub.wait)return;
+  const st=stoppedSince!==null&&now-stoppedSince>60e3,every=st?15*60e3:7*60e3;
+  if(!force&&leg===pub.leg&&st===pub.stopped&&now-pub.t<every)return;
+  pub.t=now;const prev=[pub.leg,pub.stopped];pub.leg=leg;pub.stopped=st; // claim this send before the network answers
+  const body=JSON.stringify({v:1,lat:+last.lat.toFixed(5),lng:+last.lng.toFixed(5),leg,doneAt,log,stoppedSince,speed:Math.round(lastSpeed||0),ts:now});
+  try{
+    const r=await fetch("https://ntfy.sh/"+fam.topic,{method:"POST",body});
+    if(r.status===429){pub.wait=now+10*60e3;famStatus("الخدمة طلبت التمهّل، أعيد الإرسال بعد 10 دقائق");return}
+    if(!r.ok)throw new Error(r.status);
+    famStatus("آخر إرسال للأهل: "+new Date(now).toLocaleTimeString("ar-u-nu-latn",{hour:"numeric",minute:"2-digit"}));
+  }catch(e){[pub.leg,pub.stopped]=prev;pub.t=now-every+60e3;famStatus("لا إنترنت الآن، أرسل حين تعود التغطية")}
+}
+$("famOn").onclick=()=>{fam=fam||{topic:newTopic()};fam.on=true;put("trip-fam",fam);syncFam();
+  if(last)publish(true);else famStatus("بانتظار أول موقع من الـ GPS")};
+$("famOff").onclick=()=>{fam.on=false;put("trip-fam",fam);syncFam()};
+$("famCopy").onclick=()=>{const done=()=>{$("famCopy").textContent="نُسخ ✓";setTimeout(()=>$("famCopy").textContent="نسخ الرابط",2000)};
+  try{navigator.clipboard.writeText(famURL()).then(done,()=>{$("famLink").select()})}catch(e){$("famLink").select()}};
+syncFam();
+
+/* ---------- family: following (relatives' phones) ---------- */
+let followTs=null;
+const num=(x,d=0)=>typeof x==="number"&&isFinite(x)?x:d;
+function applyRemote(text){
+  let s;try{s=JSON.parse(text)}catch(e){return}
+  if(!s||s.v!==1)return;
+  const lat=num(s.lat,NaN),lng=num(s.lng,NaN);if(!isFinite(lat)||!isFinite(lng))return;
+  if(followTs&&num(s.ts)<followTs)return;
+  leg=Math.max(0,Math.min(L.length,Math.floor(num(s.leg))));
+  doneAt={};if(s.doneAt&&typeof s.doneAt==="object")for(const k in s.doneAt)if(/^[0-4]$/.test(k))doneAt[k]=num(s.doneAt[k]);
+  const g=s.log||{},w={};if(g.wait&&typeof g.wait==="object")for(const k in g.wait)if(/^[0-9]$/.test(k))w[k]=num(g.wait[k]);
+  log={start:num(g.start,null),moving:num(g.moving),stopped:num(g.stopped),maxV:num(g.maxV),movingKm:num(g.movingKm),wait:w};
+  stoppedSince=s.stoppedSince==null?null:num(s.stoppedSince,null);lastSpeed=num(s.speed);followTs=num(s.ts);
+  last={lat,lng};renderLog();render(last,"follow");followAge();
+}
+function followAge(){
+  if(!followTs)return;const age=Date.now()-followTs;
+  $("status").textContent="آخر تحديث من هاتفه "+(age<60e3?"الآن":"منذ "+dur(age))+(age>20*60e3?" · ربما لا توجد تغطية على الطريق":"");
+  $("status").className=age>20*60e3?"status":"status ok";
+}
+async function pollLatest(){
+  try{const r=await fetch("https://ntfy.sh/"+FOLLOW+"/json?poll=1&since=12h");
+    const msgs=(await r.text()).split("\n").map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(m=>m&&m.event==="message");
+    if(msgs.length)applyRemote(msgs[msgs.length-1].message);
+    else if(!followTs){$("status").textContent="لم يصل أي تحديث بعد. يظهر هنا تلقائيًا حين يبدأ البثّ."}
+  }catch(e){if(!followTs)$("status").textContent="تعذّر الاتصال، أحاول مجددًا…"}
+}
+if(FOLLOW){
+  document.title="متابعة الرحلة إلى طرابلس";
+  $("followBar").hidden=false;$("mapLink").hidden=false;
+  ["prayerCard","family","duaBox","reset","share","screen"].forEach(id=>$(id).hidden=true);
+  $("actions").style.gridTemplateColumns="repeat(2,minmax(0,1fr))";
+  document.querySelector("h1").textContent="المدينة المنورة ← طرابلس";
+  $("status").textContent="جارٍ جلب آخر موقع…";
+  pollLatest();
+  try{const es=new EventSource("https://ntfy.sh/"+FOLLOW+"/sse");
+    es.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.event==="message")applyRemote(m.message)}catch(_){}}}catch(e){}
+  setInterval(()=>{if(last)render(last,"follow");followAge()},30e3);
+  setInterval(pollLatest,3*60e3);
+}
+if(!("geolocation" in navigator)||FOLLOW_RAW&&!FOLLOW)$("status").textContent=FOLLOW_RAW&&!FOLLOW?"رابط المتابعة غير صحيح.":$("status").textContent;
+
 /* ---------- first paint ---------- */
-$("duaBox").open=leg===0&&!get("trip-log",{}).start;
+$("duaBox").open=!FOLLOW&&leg===0&&!get("trip-log",{}).start;
 renderLog();render(P[0],false);
 
 /* ---------- offline ---------- */
