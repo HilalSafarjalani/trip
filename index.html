@@ -42,6 +42,8 @@ h1{margin:0;font-size:1.05rem;font-weight:700;color:var(--muted)}
 .stat,.card{background:var(--card);border-radius:10px;padding:11px 13px}
 .stat span{display:block;font-size:.78rem;color:var(--muted)}
 .stat strong{font-family:var(--num);font-size:1.2rem;font-variant-numeric:tabular-nums;direction:ltr;display:block;text-align:right}
+.stat.wide{grid-column:1/-1;order:-1}
+.stat.wide strong{font-family:var(--display);font-weight:900;font-size:1.6rem;text-align:right;direction:rtl}
 .stat em{font-style:normal;font-size:.72rem;color:var(--muted)}
 .status{font-size:.86rem;color:var(--muted);min-height:1.3em}
 .status.ok{color:var(--ok)}
@@ -107,10 +109,10 @@ details[open].card summary::after{content:" ▴"}
 </div>
 
 <div class="stats">
-  <div class="stat"><span>المتبقي حتى طرابلس</span><strong id="rem">— km</strong></div>
+  <div class="stat"><span>المتبقي بالطريق تقريبًا</span><strong id="rem">— km</strong></div>
   <div class="stat"><span>المقطوع</span><strong id="done">— km</strong></div>
-  <div class="stat"><span>سرعة التقدّم</span><strong id="spd">— km/h</strong></div>
-  <div class="stat"><span>الوصول لطرابلس</span><strong id="eta">—</strong><em>بتوقيت لبنان</em></div>
+  <div class="stat"><span>السرعة</span><strong id="spd">— km/h</strong></div>
+  <div class="stat wide"><span>الوصول لطرابلس</span><strong id="eta">—</strong><em id="etaNote">بتوقيت لبنان</em></div>
 </div>
 
 <div class="status" id="status" aria-live="polite">جارٍ طلب الموقع…</div>
@@ -149,7 +151,7 @@ details[open].card summary::after{content:" ▴"}
 </details>
 
 <button class="reset" id="reset" type="button">إعادة الضبط من البداية</button>
-<p class="small">المسافات جوّية بين النقاط والطريق الفعلي أطول. تنتقل المرحلة تلقائيًا حين تصل إلى نقطتها أو تتجاوزها. أوقات الوصول من سرعة تقدّمك خلال آخر ربع ساعة ولا تشمل الانتظار على المعابر. بعد أول فتح بالإنترنت تعمل الصفحة بلا إنترنت. التنبيهات تعمل ما دامت الصفحة مفتوحة.</p>
+<p class="small">المسافات جوّية بين النقاط والطريق الفعلي أطول. تنتقل المرحلة تلقائيًا حين تصل إلى نقطتها أو تتجاوزها. وقت الوصول مجالٌ محسوب من طول الطريق التقريبي لكل مرحلة ومن متوسط سرعتك أثناء السير، ولا يُضاف أي انتظار إلا حين تتوقف فعلًا. بعد أول فتح بالإنترنت تعمل الصفحة بلا إنترنت. التنبيهات تعمل ما دامت الصفحة مفتوحة.</p>
 
 <div class="toast" id="toast" role="status" aria-live="assertive"></div>
 <canvas id="confetti" aria-hidden="true"></canvas>
@@ -185,6 +187,12 @@ const L=[];for(let i=0;i<P.length-1;i++)L.push(hav(P[i],P[i+1]));
 const TOTAL=L.reduce((a,b)=>a+b,0);
 const CUM=[];{let c=0;L.forEach(d=>{c+=d;CUM.push(c)})}
 const radius=i=>Math.max(0.3,Math.min(3,L[i]*0.25));
+// Road length ÷ straight-line length per leg, as a low–high estimate:
+// Madinah–Tabuk–Haditha ~1,100–1,200 km; Omari–Azraq–Mafraq–Jaber; the crossing itself; Nasib–Damascus–Jdeidat Yabous;
+// Masnaa–Chtaura–Beirut–Tripoli through the mountains (about double the straight line).
+const ROAD=[[1.35,1.45],[1.2,1.5],[1,2],[1.1,1.25],[1.75,2.05]];
+// Highest realistic average road speed per leg (km/h): Saudi highway, Jordan desert roads, the crossing, Syria, Lebanon traffic.
+const CAP=[115,95,10,80,55];
 
 /* ---------- time helpers ---------- */
 const dkey=(ms,tz)=>new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(ms);
@@ -192,6 +200,13 @@ function fmt(ms,tz){
   const t=new Date(ms).toLocaleTimeString("ar-u-nu-latn",{timeZone:tz,hour:"numeric",minute:"2-digit"});
   const days=Math.round((Date.parse(dkey(ms,tz))-Date.parse(dkey(Date.now(),tz)))/864e5);
   return t+(days===1?" غدًا":days===2?" بعد غد":days>2?" بعد "+days+" أيام":"");
+}
+function fmtRange(a,b,tz){
+  const t=ms=>new Date(ms).toLocaleTimeString("ar-u-nu-latn",{timeZone:tz,hour:"numeric",minute:"2-digit"});
+  if(b-a<10*60e3)return fmt(b,tz);
+  if(dkey(a,tz)===dkey(b,tz)){const ta=t(a),tb=fmt(b,tz);
+    return(ta.slice(-1)===t(b).slice(-1)?ta.replace(/\s?[صم]$/,""):ta)+" – "+tb}
+  return fmt(a,tz)+" – "+fmt(b,tz);
 }
 const dur=ms=>{const m=Math.round(ms/6e4);return m<60?m+" د":Math.floor(m/60)+" س "+(m%60)+" د"};
 
@@ -291,16 +306,22 @@ function render(pos,live){
   let v=null;
   if(live){hist.push({t:now,d:rem});hist=hist.filter(h=>now-h.t<15*60e3);
     const first=hist[0];if(first&&now-first.t>60e3){v=(first.d-rem)/((now-first.t)/36e5);if(v>5)lastV=v}}
-  // average progress rate while moving (ignores border waits); steadier than the live rate at low speeds
-  if(live&&log.startDone==null){log.startDone=doneKm;put("trip-log",log)}
-  const avgV=log.moving>20*60e3&&log.startDone!=null?(doneKm-log.startDone)/(log.moving/36e5):0;
-  const moving=v!==null&&v>5,useV=v!==null&&v>30?v:avgV>20?avgV:moving?v:lastV;
-  const etaFor=(km,tz)=>useV>5?fmt(now+km/useV*36e5,tz):"—";
+  // ETA range = now + remaining ROAD km of each leg / speed for that leg.
+  // Speed is your own average while moving (stops excluded), capped by what each country's roads allow,
+  // so every minute you stand still pushes the whole range a minute later.
+  const stopped=stoppedSince!==null&&now-stoppedSince>60e3;
+  const S=log.moving>15*60e3&&log.movingKm?log.movingKm/(log.moving/36e5):null;
+  const legSpeed=i=>S?Math.min(S,CAP[i]):CAP[i];
+  const airLeft=i=>i<leg?0:i===leg?Math.min(L[i],hav(pos,P[i+1])):L[i];
+  const rangeTo=last=>{let a=0,b=0;for(let i=leg;i<=last&&i<L.length;i++){const k=airLeft(i),s=legSpeed(i);a+=k*ROAD[i][0]/s;b+=k*ROAD[i][1]/(s*0.92)}
+    return[now+a*36e5,now+b*36e5]};
+  const roadLeft=[0,1].map(j=>L.reduce((t,_,i)=>t+airLeft(i)*ROAD[i][j],0));
+  const etaFor=(i,tz)=>{const[a,b]=rangeTo(i);return fmtRange(a,b,tz)};
 
   L.forEach((d,i)=>{
     const el=$("leg"+i),bar=el.querySelector(".bar div"),pp=el.querySelector(".pp"),meta=el.querySelector(".meta");
     const lb=endTz[i]==="Asia/Beirut"?" (ت. لبنان)":"";
-    let f=0;const toEnd=Math.max(0,CUM[i]-doneKm);
+    let f=0;const toEnd=i;
     if(i<leg){f=1;el.className="leg done";meta.textContent=d.toFixed(1)+" km · تمّت ✓"+(doneAt[i]?" الساعة "+fmt(doneAt[i],endTz[i])+lb:"")}
     else if(i===leg){const r=hav(pos,P[i+1]);f=Math.max(0,Math.min(1,(d-r)/d));el.className="leg active";
       meta.textContent="متبقٍ "+r.toFixed(1)+" من "+d.toFixed(1)+" km · الوصول "+etaFor(toEnd,endTz[i])+lb}
@@ -310,9 +331,12 @@ function render(pos,live){
 
   $("pct").innerHTML=(p<10?p.toFixed(1):Math.floor(p))+"<small>%</small>";
   $("fill").style.width=p+"%";$("car").style.right=p+"%";
-  $("rem").textContent=rem.toFixed(0)+" km";$("done").textContent=doneKm.toFixed(0)+" km";
-  if(v!==null)$("spd").textContent=(v>0?v.toFixed(0):"0")+" km/h";
-  $("eta").textContent=arrived?"وصلت ✓":useV>5?fmt(now+rem/useV*36e5,"Asia/Beirut")+(moving?"":" ·متوقّف"):(v!==null?"متوقّف":"—");
+  $("rem").textContent=arrived?"0 km":Math.round(roadLeft[0]/10)*10+"–"+Math.round(roadLeft[1]/10)*10+" km";
+  $("done").textContent=doneKm.toFixed(0)+" km";
+  if(live)$("spd").textContent=(stopped?0:Math.max(0,lastSpeed)).toFixed(0)+" km/h";
+  const fin=rangeTo(L.length-1);
+  $("eta").textContent=arrived?"وصلت ✓":fmtRange(fin[0],fin[1],"Asia/Beirut");
+  $("etaNote").textContent=!arrived&&stopped?"متوقّف منذ "+dur(now-stoppedSince)+"، والوقت يتأخر معه":"بتوقيت لبنان"+(S?"":" · يدقّ أكثر بعد ربع ساعة سير");
 
   const cc=arrived?"LB":legCountry(leg);
   $("country").textContent=C[cc].flag+" "+C[cc].name;
@@ -320,8 +344,8 @@ function render(pos,live){
 
   // share link
   const msg=arrived?"وصلنا طرابلس بحمد الله ✓":
-    `📍 قطعنا ${Math.floor(p)}٪ من الطريق إلى طرابلس\nالآن في ${C[cc].name} ${C[cc].flag}، متبقٍ نحو ${rem.toFixed(0)} كم (خط مستقيم)`+
-    (useV>5?`\nالوصول المتوقع: ${fmt(now+rem/useV*36e5,"Asia/Beirut")} بتوقيت لبنان`:"")+
+    `📍 قطعنا ${Math.floor(p)}٪ من الطريق إلى طرابلس\nالآن في ${C[cc].name} ${C[cc].flag}، متبقٍ نحو ${Math.round(roadLeft[0]/10)*10}–${Math.round(roadLeft[1]/10)*10} كم`+
+    `\nالوصول المتوقع: بين ${fmtRange(fin[0],fin[1],"Asia/Beirut")} بتوقيت لبنان`+
     `\nموقعي: https://maps.google.com/?q=${pos.lat.toFixed(5)},${pos.lng.toFixed(5)}`;
   $("share").href="https://wa.me/?text="+encodeURIComponent(msg);
 
@@ -361,21 +385,31 @@ function renderPrayer(pos,cc){
 setInterval(()=>{if(pLast)renderPrayer(pLast.pos,pLast.cc)},30e3);
 
 /* ---------- trip log ---------- */
-let lastFix=null;
+let lastFix=null,stoppedSince=null,lastSpeed=0;
+const accurateSpeed=g=>g.coords.speed!=null&&g.coords.speed>=0&&g.coords.accuracy<100?g.coords.speed*3.6:null;
 function updateLog(g){
   const now=Date.now(),pos={lat:g.coords.latitude,lng:g.coords.longitude};
   if(!log.start)log.start=now;
   if(lastFix&&leg<L.length){
     const dt=now-lastFix.t;
-    if(dt>0&&dt<5*60e3){
-      let kmh=g.coords.speed!=null&&g.coords.speed>=0?g.coords.speed*3.6:hav(lastFix.pos,pos)/(dt/36e5);
-      if(kmh<3){log.stopped+=dt;const z=ZONES.find(z=>hav(pos,P[z.p])<z.r);if(z)log.wait[z.p]=(log.wait[z.p]||0)+dt}
-      else log.moving+=dt;
+    if(dt>0&&dt<6*36e5){
+      const moved=hav(lastFix.pos,pos);
+      // long gaps (page closed or GPS quiet): judge by distance covered; short gaps: by reported speed
+      let kmh=dt<5*60e3&&g.coords.speed!=null&&g.coords.speed>=0?g.coords.speed*3.6:moved/(dt/36e5);
+      if(kmh<3||moved<0.05&&dt>=60e3){log.stopped+=dt;if(stoppedSince===null)stoppedSince=lastFix.t;
+        const z=ZONES.find(z=>hav(pos,P[z.p])<z.r);if(z)log.wait[z.p]=(log.wait[z.p]||0)+dt}
+      else{log.moving+=dt;log.movingKm=(log.movingKm||0)+moved;stoppedSince=null}
+      lastSpeed=accurateSpeed(g)??kmh;
       if(g.coords.speed!=null&&g.coords.accuracy<30){const s=g.coords.speed*3.6;if(s<200&&s>log.maxV)log.maxV=s}
     }
   }
   lastFix={t:now,pos};put("trip-log",log);renderLog();
 }
+// When standing still the GPS often stops reporting. Every 30 s, count the quiet time as stopped and refresh the ETA.
+setInterval(()=>{
+  if(!last||leg>=L.length||Date.now()-lastFix.t<45e3)return;
+  updateLog({coords:{latitude:last.lat,longitude:last.lng,speed:0,accuracy:999}});render(last,true);
+},30e3);
 function renderLog(){
   const rows=[["بداية التتبّع",log.start?fmt(log.start,"Asia/Riyadh"):"—"],
     ["المدة منذ البداية",log.start?dur(Date.now()-log.start):"—"],["وقت السير",dur(log.moving)],["وقت التوقف",dur(log.stopped)],
@@ -410,7 +444,7 @@ $("screen").onclick=()=>{screenOn=!screenOn;put("trip-screen",screenOn);applyScr
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")applyScreen()});
 applyScreen();
 
-$("reset").onclick=()=>{leg=0;doneAt={};fired={};lastCountry=null;prevP=null;hist=[];lastV=0;lastFix=null;
+$("reset").onclick=()=>{leg=0;stoppedSince=null;doneAt={};fired={};lastCountry=null;prevP=null;hist=[];lastV=0;lastFix=null;
   log={start:null,moving:0,stopped:0,maxV:0,wait:{}};
   ["trip-leg","trip-done","trip-fired","trip-country","trip-log"].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
   renderLog();render(last||P[0],false)};
