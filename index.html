@@ -38,7 +38,7 @@ h1{margin:0;font-size:1.05rem;font-weight:700;color:var(--muted)}
 .ticks{position:absolute;inset:0;z-index:1}
 .ticks i{position:absolute;top:0;bottom:0;width:2px;background:var(--sand);opacity:.6}
 .flags{position:relative;height:24px;margin-top:4px;font-size:1.05rem}
-.flags span{position:absolute;top:0;transform:translateX(50%);line-height:24px}
+.flags span{position:absolute;top:0;line-height:24px;padding-right:3px}
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .stat,.card{background:var(--card);border-radius:10px;padding:11px 13px}
 .stat span{display:block;font-size:.78rem;color:var(--muted)}
@@ -281,9 +281,9 @@ const fire=k=>{if(fired[k])return false;fired[k]=1;put("trip-fired",fired);retur
 /* ---------- UI scaffold ---------- */
 const $=id=>document.getElementById(id);
 {let acc=0;for(let i=0;i<L.length-1;i++){acc+=L[i];const t=document.createElement("i");t.style.right=(acc/TOTAL*100)+"%";$("ticks").appendChild(t)}}
-// each flag sits in the middle of that country's real share of the route
+// each flag sits right after the border line where that country begins
 [["🇸🇦",0,CUM[0]],["🇯🇴",CUM[0],CUM[2]],["🇸🇾",CUM[2],CUM[3]],["🇱🇧",CUM[3],TOTAL]].forEach(([f,a,b])=>{
-  const s=document.createElement("span");s.textContent=f;s.style.right=Math.min(96,(a+b)/2/TOTAL*100).toFixed(2)+"%";$("flagrow").appendChild(s)});
+  const s=document.createElement("span");s.textContent=f;s.style.right=(a/TOTAL*100).toFixed(2)+"%";$("flagrow").appendChild(s)});
 L.forEach((d,i)=>{const el=document.createElement("div");el.className="leg";el.id="leg"+i;
   el.innerHTML=`<header><span class="name">${i+1}. ${P[i].n} ← ${P[i+1].n}</span><span class="pp">0%</span></header><div class="bar"><div></div></div><div class="meta"></div>`;
   $("legs").appendChild(el)});
