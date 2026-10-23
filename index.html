@@ -26,6 +26,7 @@ h1{margin:0;font-size:1.05rem;font-weight:700;color:var(--muted)}
 .chip{background:var(--card);border-radius:999px;padding:5px 12px;font-size:.85rem;font-weight:700;white-space:nowrap}
 .pct{font-weight:900;font-size:clamp(4.2rem,22vw,7.5rem);line-height:.9;font-variant-numeric:tabular-nums;direction:ltr;text-align:right}
 .pct small{font-size:.4em;color:var(--dune)}
+.pct .dec{font-size:.45em;color:var(--dune);letter-spacing:.02em}
 .ends{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted);margin-bottom:6px}
 .ends b{color:var(--ink);display:block;font-size:1rem}
 .road{position:relative;height:44px;background:var(--road);border-radius:6px;overflow:hidden}
@@ -356,7 +357,9 @@ function render(pos,mode){
     bar.style.width=(f*100)+"%";pp.textContent=Math.floor(f*100)+"%";
   });
 
-  $("pct").innerHTML=(p<10?p.toFixed(1):Math.floor(p))+"<small>%</small>";
+  // four decimals so every few metres show (0.0001% of the route is about 1 m)
+  const pv=Math.min(1e6,Math.floor(p*1e4));
+  $("pct").innerHTML=Math.floor(pv/1e4)+'<span class="dec">.'+String(pv%1e4).padStart(4,"0")+"</span><small>%</small>";
   $("fill").style.width=p+"%";$("car").style.right=p+"%";
   $("rem").textContent=arrived?"0 km":Math.round(roadLeft[0]/10)*10+"–"+Math.round(roadLeft[1]/10)*10+" km";
   $("done").textContent=doneKm.toFixed(0)+" km";
