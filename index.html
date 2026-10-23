@@ -3,25 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17140f">
 <title>الطريق إلى طرابلس</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&family=Amiri:wght@400;700&display=swap">
 <style>
-/* Layout: big overall road strip to Tripoli on top, then one row per leg; only the active leg is lit */
+/* Layout: big overall road strip to Tripoli, then prayer card, actions, per-leg rows (only the active one lit), trip log, adhkar */
 :root{
-  --sand:#f3ece0; --ink:#2b2418; --dune:#c9a86a; --road:#3a3328; --line:#f6e7b0; --muted:#7a6a52; --ok:#2f7d4f; --card:#fbf7ef;
+  --sand:#f3ece0; --ink:#2b2418; --dune:#c9a86a; --road:#3a3328; --line:#f6e7b0; --muted:#7a6a52; --ok:#2f7d4f; --warn:#a4561d; --card:#fbf7ef;
   --display:"Tajawal","Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif;
+  --quran:"Amiri","Noto Naskh Arabic","Traditional Arabic",serif;
   --num:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root{
-  --sand:#17140f; --ink:#f1e8d6; --dune:#d8b671; --road:#0b0a07; --line:#e8d48f; --muted:#a8977a; --ok:#5fbf86; --card:#211d16; color-scheme:dark}}
+  --sand:#17140f; --ink:#f1e8d6; --dune:#d8b671; --road:#0b0a07; --line:#e8d48f; --muted:#a8977a; --ok:#5fbf86; --warn:#e39a5c; --card:#211d16; color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--sand);color:var(--ink);font-family:var(--display);
-  padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
-  display:flex;flex-direction:column;gap:20px;max-width:640px;margin-inline:auto}
-h1{margin:0;font-size:1.1rem;font-weight:700;color:var(--muted)}
+  padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(90px,calc(env(safe-area-inset-bottom) + 90px)) max(16px,env(safe-area-inset-left));
+  display:flex;flex-direction:column;gap:18px;max-width:640px;margin-inline:auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h1{margin:0;font-size:1.05rem;font-weight:700;color:var(--muted)}
+.chip{background:var(--card);border-radius:999px;padding:5px 12px;font-size:.85rem;font-weight:700;white-space:nowrap}
 .pct{font-weight:900;font-size:clamp(4.2rem,22vw,7.5rem);line-height:.9;font-variant-numeric:tabular-nums;direction:ltr;text-align:right}
 .pct small{font-size:.4em;color:var(--dune)}
-.ends{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted)}
+.ends{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted);margin-bottom:6px}
 .ends b{color:var(--ink);display:block;font-size:1rem}
 .road{position:relative;height:44px;background:var(--road);border-radius:6px;overflow:hidden}
 .road::after{content:"";position:absolute;inset:50% 0 auto;height:3px;margin-top:-1.5px;
@@ -30,134 +34,3 @@ h1{margin:0;font-size:1.1rem;font-weight:700;color:var(--muted)}
 .car{position:absolute;top:50%;right:0;transform:translate(50%,-50%);width:28px;height:28px;border-radius:50%;
   background:var(--card);border:3px solid var(--ink);transition:right 1.2s ease;z-index:2}
 .ticks{position:absolute;inset:0;z-index:1}
-.ticks i{position:absolute;top:0;bottom:0;width:2px;background:var(--sand);opacity:.6}
-.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.stat{background:var(--card);border-radius:10px;padding:11px 13px}
-.stat span{display:block;font-size:.78rem;color:var(--muted)}
-.stat strong{font-family:var(--num);font-size:1.25rem;font-variant-numeric:tabular-nums;direction:ltr;display:block;text-align:right}
-h2{margin:6px 0 0;font-size:1rem}
-.legs{display:flex;flex-direction:column;gap:10px}
-.leg{background:var(--card);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;opacity:.45;transition:opacity .4s}
-.leg.active{opacity:1;outline:2px solid var(--dune)}
-.leg.done{opacity:.75}
-.leg header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.leg .name{font-weight:700;font-size:.95rem;min-width:0}
-.leg .pp{font-family:var(--num);font-variant-numeric:tabular-nums;direction:ltr;font-size:1rem;white-space:nowrap}
-.bar{height:10px;background:var(--road);border-radius:5px;overflow:hidden;position:relative}
-.bar div{position:absolute;inset:0 0 0 auto;width:0;background:var(--dune);transition:width 1s ease}
-.leg.done .bar div{background:var(--ok)}
-.leg .meta{font-size:.8rem;color:var(--muted)}
-.status{font-size:.88rem;color:var(--muted);min-height:1.3em}
-.status.ok{color:var(--ok)}
-button{font:inherit;font-size:.85rem;background:none;border:1.5px solid var(--muted);color:var(--ink);border-radius:8px;padding:9px 13px;align-self:flex-start}
-button:focus-visible{outline:3px solid var(--dune);outline-offset:2px}
-.note{font-size:.76rem;color:var(--muted);line-height:1.6;margin:0}
-@media (prefers-reduced-motion:reduce){.fill,.car,.bar div{transition:none}}
-</style>
-</head>
-<body>
-<h1>المدينة المنورة ← طرابلس، لبنان</h1>
-<div class="pct" id="pct">0<small>%</small></div>
-
-<div>
-  <div class="ends"><div><b>المدينة</b>بئر عثمان</div><div style="text-align:left"><b>طرابلس</b>ساحة التل</div></div>
-  <div class="road" aria-hidden="true"><div class="fill" id="fill"></div><div class="ticks" id="ticks"></div><div class="car" id="car"></div></div>
-</div>
-
-<div class="stats">
-  <div class="stat"><span>المتبقي حتى طرابلس</span><strong id="rem">— km</strong></div>
-  <div class="stat"><span>المقطوع</span><strong id="done">— km</strong></div>
-  <div class="stat"><span>سرعة التقدّم</span><strong id="spd">— km/h</strong></div>
-  <div class="stat"><span>الوصول المتوقع لطرابلس</span><strong id="eta">—</strong></div>
-</div>
-
-<div class="status" id="status">جارٍ طلب الموقع…</div>
-
-<h2>المراحل</h2>
-<div class="legs" id="legs"></div>
-
-<button id="reset" type="button">إعادة الضبط من البداية</button>
-<p class="note">المسافات جوّية بين النقاط، والطريق الفعلي أطول. تنتقل المرحلة تلقائيًا حين تصل إلى نقطتها أو تتجاوزها. وقت الوصول محسوب من سرعة تقدّمك الفعلية خلال آخر ربع ساعة، فيظهر «متوقّف» أثناء الانتظار على الحدود.</p>
-
-<script>
-const P=[
-  {n:"المدينة",lat:24.4889704,lng:39.5833142},
-  {n:"منفذ العمري",lat:31.5333612,lng:37.0808639},
-  {n:"حدود جابر",lat:32.5194485,lng:36.1952749},
-  {n:"حدود نصيب",lat:32.5305399,lng:36.2007712},
-  {n:"حدود المصنع",lat:33.7017257,lng:35.9276778},
-  {n:"طرابلس",lat:34.4361914,lng:35.8387404}
-];
-const hav=(a,b)=>{const R=6371,r=x=>x*Math.PI/180,dp=r(b.lat-a.lat),dl=r(b.lng-a.lng);
-  const h=Math.sin(dp/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
-const L=[];for(let i=0;i<P.length-1;i++)L.push(hav(P[i],P[i+1]));
-const TOTAL=L.reduce((a,b)=>a+b,0);
-const radius=i=>Math.max(0.3,Math.min(3,L[i]*0.25));
-const $=id=>document.getElementById(id);
-const KEY="trip-leg";
-let leg=0;try{leg=+localStorage.getItem(KEY)||0}catch(e){}
-const saveLeg=()=>{try{localStorage.setItem(KEY,leg)}catch(e){}};
-
-// build ticks + leg rows
-let acc=0;const ticks=$("ticks");
-for(let i=0;i<L.length-1;i++){acc+=L[i];const t=document.createElement("i");t.style.right=(acc/TOTAL*100)+"%";ticks.appendChild(t)}
-const legsEl=$("legs");
-L.forEach((d,i)=>{const el=document.createElement("div");el.className="leg";el.id="leg"+i;
-  el.innerHTML=`<header><span class="name">${i+1}. ${P[i].n} ← ${P[i+1].n}</span><span class="pp">0%</span></header><div class="bar"><div></div></div><div class="meta">${d.toFixed(1)} km · بانتظار دورها</div>`;
-  legsEl.appendChild(el)});
-
-let hist=[],last=null;
-function advance(pos){
-  let moved=false;
-  while(leg<L.length){
-    const end=P[leg+1];
-    const near=hav(pos,end)<radius(leg);
-    const past=leg+1<L.length && hav(pos,P[leg+2])<L[leg+1]-2;
-    if(near||past){leg++;moved=true}else break;
-  }
-  if(moved)saveLeg();
-}
-function render(pos){
-  advance(pos);
-  let doneKm=0;
-  L.forEach((d,i)=>{
-    const el=$("leg"+i),bar=el.querySelector(".bar div"),pp=el.querySelector(".pp"),meta=el.querySelector(".meta");
-    let f=0;
-    if(i<leg){f=1;el.className="leg done";meta.textContent=d.toFixed(1)+" km · تمّت ✓"}
-    else if(i===leg){const rem=hav(pos,P[i+1]);f=Math.max(0,Math.min(1,(d-rem)/d));el.className="leg active";
-      meta.textContent="متبقٍ "+rem.toFixed(1)+" km من "+d.toFixed(1)+" km"}
-    else{el.className="leg";meta.textContent=d.toFixed(1)+" km · بانتظار دورها"}
-    bar.style.width=(f*100)+"%";pp.textContent=Math.floor(f*100)+"%";doneKm+=f*d;
-  });
-  if(leg>=L.length)doneKm=TOTAL;
-  const p=doneKm/TOTAL*100, rem=TOTAL-doneKm;
-  $("pct").innerHTML=(p<10?p.toFixed(1):Math.floor(p))+"<small>%</small>";
-  $("fill").style.width=p+"%";$("car").style.right=p+"%";
-  $("rem").textContent=rem.toFixed(0)+" km";$("done").textContent=doneKm.toFixed(0)+" km";
-  const now=Date.now();hist.push({t:now,d:rem});hist=hist.filter(h=>now-h.t<15*60e3);
-  const first=hist[0];
-  if(first&&now-first.t>60e3){
-    const v=(first.d-rem)/((now-first.t)/36e5);
-    $("spd").textContent=(v>0?v.toFixed(0):"0")+" km/h";
-    if(v>5){const ms=rem/v*36e5,eta=new Date(now+ms);
-      const sameDay=eta.toDateString()===new Date().toDateString();
-      $("eta").textContent=eta.toLocaleTimeString("ar-u-nu-latn",{hour:"numeric",minute:"2-digit"})+(sameDay?"":" (غدًا+)");}
-    else $("eta").textContent="متوقّف";
-  }
-  if(leg>=L.length){$("status").textContent="وصلتَ طرابلس بحمد الله ✓";$("status").className="status ok"}
-}
-
-if(!("geolocation" in navigator)){$("status").textContent="المتصفح لا يدعم تحديد الموقع."}
-else navigator.geolocation.watchPosition(g=>{
-  last={lat:g.coords.latitude,lng:g.coords.longitude};
-  if(leg<L.length){$("status").textContent="آخر تحديث "+new Date().toLocaleTimeString("ar-u-nu-latn")+" · دقة ±"+Math.round(g.coords.accuracy)+" م";$("status").className="status ok"}
-  render(last);
-},e=>{$("status").textContent=e.code===1?"رُفض إذن الموقع. افتح الصفحة من رابط https واسمح بالموقع.":"تعذّر الحصول على الموقع، أحاول مجددًا…";$("status").className="status"},
-{enableHighAccuracy:true,maximumAge:15000,timeout:30000});
-
-$("reset").onclick=()=>{leg=0;saveLeg();hist=[];if(last)render(last)};
-async function wake(){try{await navigator.wakeLock.request("screen")}catch(e){}}
-wake();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")wake()});
-</script>
-</body>
-</html>
